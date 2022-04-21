@@ -3,3 +3,5 @@ coverage:
   fixes:
   - "/usr/local/bin/::keylime/cmd/"
   - "/usr/local/lib/python*/site-packages/keylime-*/::"
+comment:
+  layout: "files"
