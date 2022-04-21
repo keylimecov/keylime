@@ -12,6 +12,7 @@ from keylime import tenant
 
 logger = keylime_logging.init_logging('tenant')
 
+foo = "bar"
 
 def main():
     try:

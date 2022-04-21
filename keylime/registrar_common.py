@@ -8,8 +8,8 @@ import base64
 import threading
 import signal
 import sys
-import os
 import http.server
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from sqlalchemy.exc import SQLAlchemyError
