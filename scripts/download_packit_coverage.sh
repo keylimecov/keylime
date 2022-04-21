@@ -19,8 +19,10 @@ echo "GITHUB_API_URL=${GITHUB_API_URL}"
 DURATION=0
 MAX_DURATION=600  # maximum action duration in seconds
 SLEEP_DELAY=60
+TF_BASEURL=''
 while [ -z "${TF_BASEURL}" -a ${DURATION} -lt ${MAX_DURATION} ]; do
-    TF_BASEURL=$( curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_URL}" | sed -n "/${TF_JOB_DESC}/, /\"id\"/ p" | egrep -o 'https://artifacts.dev.testing-farm.io/[^ ]*' )
+    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_URL}" &> curl.out
+    TF_BASEURL=$( cat curl.out | sed -n "/${TF_JOB_DESC}/, /\"id\"/ p" | egrep -o 'https://artifacts.dev.testing-farm.io/[^ ]*' )
     DURATION=$(( $DURATION+$SLEEP_DELAY ))
     [ -z "${TF_BASEURL}" ] && sleep $SLEEP_DELAY
 done
@@ -35,13 +37,13 @@ echo "TF_BASEURL=${TF_BASEURL}"
 # now we wait for the Testing farm job to finish
 DURATION=0
 MAX_DURATION=$(( 60*90 ))
-SLEEP_DELAY=60
+SLEEP_DELAY=120
+TF_STATUS=''
 while [ "${TF_STATUS}" != "completed" -a ${DURATION} -lt ${MAX_DURATION} ]; do
     curl -s -H "Accept: application/vnd.github.v3+json" ${GITHUB_API_URL} | sed -n "/${TF_JOB_DESC}/, /\"id\"/ p" &> curl.out
-    cat curl.out
-    TF_STATUS=$( cat curl.out | grep '"status":' | cut -d '"' -f 4 )
+    TF_STATUS=$( cat curl.out | grep '"status"' | cut -d '"' -f 4 )
     DURATION=$(( $DURATION+$SLEEP_DELAY ))
-    [ -z "${TF_STATUS}" ] && echo "Status: $TF_STATUS, waiting..." && sleep $SLEEP_DELAY
+    [ "${TF_STATUS}" != "completed" ] && echo "Testing Farm job status: ${TF_STATUS}, waiting ${SLEEP_DELAY} seconds..." && sleep ${SLEEP_DELAY}
 done
 
 if [ "${TF_STATUS}" != "completed" ]; then
