@@ -13,8 +13,8 @@ TF_JOB_DESC="testing-farm:fedora-35-x86_64"
 
 # First we try to get URL of Testing farm job
 DURATION=0
-MAX_DURATION=10  # maximum action duration in seconds
-SLEEP_DELAY=10
+MAX_DURATION=600  # maximum action duration in seconds
+SLEEP_DELAY=60
 while [ -z "${TF_BASEURL}" -a ${DURATION} -lt ${MAX_DURATION} ]; do
     TF_BASEURL=$( curl -s -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${PROJECT}/commits/${COMMIT}/check-runs | sed -n "/${TF_JOB_DESC}/"', /"id"/ p' | egrep -o 'https://artifacts.dev.testing-farm.io/[^ ]*' )
     DURATION=$(( $DURATION+$SLEEP_DELAY ))
