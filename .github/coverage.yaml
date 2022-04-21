@@ -1,0 +1,16 @@
+name: Code coverage measurement on codecov.io
+
+on: [pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Submit code coverage from Packit tests
+    defaults:
+      run:
+        working-directory: /
+    steps:
+    - name: Wait for Packit tests to finish and download coverage.xml file
+      run: scripts/download_packit_coverage.sh $GITHUB_SHA
+#    - name: Upload coverage reports to Codecov with GitHub Action
+#     uses: codecov/codecov-action@v2
