@@ -8,7 +8,7 @@ fi
 COMMIT=$GITHUB_SHA
 [ -n "$1" ] && COMMIT="$1"
 
-PROJECT="keylime/keylime"
+#PROJECT="keylime/keylime"
 PROJECT="keylimecov/keylime"
 TF_JOB_DESC="testing-farm:fedora-35-x86_64"
 GITHUB_API_URL="https://api.github.com/repos/${PROJECT}/commits/${COMMIT}/check-runs"
@@ -53,19 +53,23 @@ fi
 
 echo "TF_STATUS=${TF_STATUS}"
 
+sleep 10
+
 # now we read the test log
 TF_TESTLOG=$( curl -s ${TF_BASEURL}/results.xml | egrep -o 'https://artifacts.dev.testing-farm.io/.*/data/setup/generate_coverage_report/output.txt' )
 
 echo "TF_TESTLOG=${TF_TESTLOG}"
 
 # parse the URL to transfer.sh with coverage.xml file
-COVERAGE_URL=$( curl -s "${TF_TESTLOG}" | grep 'coverage.xml report is available at' | grep -o 'https://transfer.sh/.*/coverage.xml' )
+for REPORT in coverage.packit.xml coverage.testsuite.xml coverage.unittests.xml; do
+    COVERAGE_URL=$( curl -s "${TF_TESTLOG}" | grep "$REPORT report is available at" | grep -o 'https://transfer.sh/.*\.xml' )
 
-if [ -z "${COVERAGE_URL}" ]; then
-    echo "Could not parse coverage.xml URL at transfer.sh from test log ${TF_TESTLOG}"
-    exit 4
-fi
+    if [ -z "${COVERAGE_URL}" ]; then
+        echo "Could not parse $REPORT URL at transfer.sh from test log ${TF_TESTLOG}"
+        exit 4
+    fi
 
-echo "COVERAGE_URL=${COVERAGE_URL}"
+    echo "COVERAGE_URL=${COVERAGE_URL}"
 
-curl -O ${COVERAGE_URL}
+    curl -O ${COVERAGE_URL}
+done
