@@ -7,3 +7,11 @@ comment:
   behavior: default
   require_changes: false
   require_base: no
+
+flags:
+  testsuite:
+    carryforward: false
+  unittests:
+    carryforward: false
+  packit-e2e:
+    carryforward: false
