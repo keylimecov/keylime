@@ -3,13 +3,13 @@ SPDX-License-Identifier: Apache-2.0
 Copyright 2017 Massachusetts Institute of Technology.
 '''
 
+import os
 import ipaddress
 import base64
 import threading
 import signal
 import sys
 import http.server
-import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from sqlalchemy.exc import SQLAlchemyError
@@ -30,7 +30,6 @@ from keylime import api_version as keylime_api_version
 from keylime import web_util
 
 logger = keylime_logging.init_logging('registrar')
-#testmessage = "foo"
 
 
 try:

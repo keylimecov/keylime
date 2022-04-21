@@ -24,6 +24,7 @@ logger = keylime_logging.init_logging('cloudverifier_common')
 
 GLOBAL_TPM_INSTANCE = None
 DEFAULT_VERIFIER_ID = "default"
+foo = "bar"
 
 
 def get_tpm_instance():
