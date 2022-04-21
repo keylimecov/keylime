@@ -8,12 +8,12 @@ jobs:
     name: Submit code coverage from Packit tests
     defaults:
       run:
-        working-directory: .git
+        working-directory: scripts
     steps:
     - uses: actions/checkout@v3
     - name: Display downloaded files
       run: ls
     - name: Wait for Packit tests to finish and download coverage.xml file
-      run: scripts/download_packit_coverage.sh $GITHUB_SHA
+      run: ./download_packit_coverage.sh $GITHUB_SHA
 #    - name: Upload coverage reports to Codecov with GitHub Action
 #      uses: codecov/codecov-action@v2
