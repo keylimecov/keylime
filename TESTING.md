@@ -1,7 +1,5 @@
 # Keylime testing
 
-foo
-
 ## Pull-request testing
 
 Individual changes to keylime are introduced using the pull-request workflow and for each pull-request update a set of test is executed.
