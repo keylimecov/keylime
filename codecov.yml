@@ -1,7 +1,17 @@
 coverage:
-  disable_default_path_fixes: true
   fixes:
   - "/usr/local/bin/::keylime/cmd/"
   - "/usr/local/lib/python*/site-packages/keylime-*/::"
 comment:
-  layout: "files"
+  layout: "flags,files"
+  behavior: default
+  require_changes: false
+  require_base: no
+
+flags:
+  testsuite:
+    carryforward: false
+  unittests:
+    carryforward: false
+  packit-e2e:
+    carryforward: false
