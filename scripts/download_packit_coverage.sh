@@ -7,22 +7,26 @@ fi
 
 COMMIT=$GITHUB_SHA
 [ -n "$1" ] && COMMIT="$1"
+
 PROJECT="keylime/keylime"
 PROJECT="keylimecov/keylime"
 TF_JOB_DESC="testing-farm:fedora-35-x86_64"
+GITHUB_API_URL="https://api.github.com/repos/${PROJECT}/commits/${COMMIT}/check-runs"
+
+echo "GITHUB_API_URL=${GITHUB_API_URL}"
 
 # First we try to get URL of Testing farm job
 DURATION=0
 MAX_DURATION=600  # maximum action duration in seconds
 SLEEP_DELAY=60
 while [ -z "${TF_BASEURL}" -a ${DURATION} -lt ${MAX_DURATION} ]; do
-    TF_BASEURL=$( curl -s -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${PROJECT}/commits/${COMMIT}/check-runs | sed -n "/${TF_JOB_DESC}/"', /"id"/ p' | egrep -o 'https://artifacts.dev.testing-farm.io/[^ ]*' )
+    TF_BASEURL=$( curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_URL}" | sed -n "/${TF_JOB_DESC}/, /\"id\"/ p" | egrep -o 'https://artifacts.dev.testing-farm.io/[^ ]*' )
     DURATION=$(( $DURATION+$SLEEP_DELAY ))
     [ -z "${TF_BASEURL}" ] && sleep $SLEEP_DELAY
 done
 
 if [ -z "${TF_BASEURL}" ]; then
-  echo "Cannot parse artifacts URL for ${TF_JOB_DESC} from https://api.github.com/repos/${PROJECT}/commits/${COMMIT}/check-runs"
+  echo "Cannot parse artifacts URL for ${TF_JOB_DESC} from ${GITHUB_API_URL}"
   exit 2
 fi
 
@@ -33,7 +37,9 @@ DURATION=0
 MAX_DURATION=$(( 60*90 ))
 SLEEP_DELAY=60
 while [ "${TF_STATUS}" != "completed" -a ${DURATION} -lt ${MAX_DURATION} ]; do
-    TF_STATUS=$( curl -s -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${PROJECT}/commits/${COMMIT}/check-runs | sed -n "/${TF_JOB_DESC}/"', /"id"/ p' | grep '"status":' | cut -d '"' -f 4 )
+    curl -s -H "Accept: application/vnd.github.v3+json" ${GITHUB_API_URL} | sed -n "/${TF_JOB_DESC}/, /\"id\"/ p" &> curl.out
+    cat curl.out
+    TF_STATUS=$( cat curl.out | grep '"status":' | cut -d '"' -f 4 )
     DURATION=$(( $DURATION+$SLEEP_DELAY ))
     [ -z "${TF_STATUS}" ] && echo "Status: $TF_STATUS, waiting..." && sleep $SLEEP_DELAY
 done
