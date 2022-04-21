@@ -4,4 +4,7 @@ coverage:
   - "/usr/local/bin/::keylime/cmd/"
   - "/usr/local/lib/python*/site-packages/keylime-*/::"
 comment:
-  layout: "files"
+  layout: "flags,files"
+  behavior: default
+  require_changes: false
+  require_base: no
