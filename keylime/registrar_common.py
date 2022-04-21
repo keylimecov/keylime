@@ -6,8 +6,8 @@ Copyright 2017 Massachusetts Institute of Technology.
 import base64
 import ipaddress
 import threading
-import sys
 import signal
+import sys
 import os
 import http.server
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -42,13 +42,13 @@ except SQLAlchemyError as err:
 
 class ProtectedHandler(BaseHTTPRequestHandler, SessionManager):
 
-    def do_HEAD(self):
-        """HEAD not supported"""
-        web_util.echo_json_response(self, 405, "HEAD not supported")
-
     def do_PATCH(self):
         """PATCH not supported"""
         web_util.echo_json_response(self, 405, "PATCH not supported")
+
+    def do_HEAD(self):
+        """HEAD not supported"""
+        web_util.echo_json_response(self, 405, "HEAD not supported")
 
     def do_GET(self):
         """This method handles the GET requests to retrieve status on agents from the Registrar Server.
