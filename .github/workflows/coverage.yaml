@@ -1,6 +1,6 @@
-name: Code coverage measurement on codecov.io
+name: PR code coverage measurement on codecov.io
 
-on: [pull_request, push]
+on: [pull_request]
 
 jobs:
   build:
