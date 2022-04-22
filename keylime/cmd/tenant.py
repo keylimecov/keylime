@@ -18,6 +18,7 @@ def main():
     try:
         tenant.main()
     except tenant.UserError as ue:
+        1+1
         logger.error(str(ue))
         sys.exit(1)
     except Exception as e:
