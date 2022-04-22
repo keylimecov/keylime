@@ -43,9 +43,9 @@ fi
 COMMIT=$GITHUB_SHA
 [ -n "$1" ] && COMMIT="$1"
 
-# build GITHUB_API_URL using the COMMIT
-GITHUB_API_URL="https://api.github.com/repos/${PROJECT}/commits/${COMMIT}/check-runs"
-echo "GITHUB_API_URL=${GITHUB_API_URL}"
+# build GITHUB_API_PR_URL using the COMMIT
+GITHUB_API_PR_URL="https://api.github.com/repos/${PROJECT}/commits/${COMMIT}/pulls"
+echo "GITHUB_API_PR_URL=${GITHUB_API_PR_URL}"
 
 # meassure approx. task duration
 DURATION=0
@@ -56,23 +56,51 @@ TMPFILE=$( mktemp )
 # now start with the actual processing
 ######################################
 
+# First we need to get the actual HEAD commit from PR.
+# On GitHub commit always changes when doing rebase and merge
+# and therefore commit differs between the PR branch and master branch
+# Here we try to find the commit from PR branch since this is the commit
+# for which tests have been run.
 
-# First we try to parse URL of Testing farm job from GITHUB_API_URL page
+PR_COMMIT=''
+while [ -z "${PR_COMMIT}" -a ${DURATION} -lt ${MAX_DURATION} ]; do
+    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_PR_URL}" &> ${TMPFILE}
+    PR_COMMIT=$( cat ${TMPFILE} | grep '"sha"' | head -1 | cut -d '"' -f 4 )
+    # if we have failed to parse PR_COMMIT, wait a bit and try again
+    if [ -z "${PR_COMMIT}" ]; then
+        echo "Failed to parse PR commit from ${GITHUB_API_PR_URL}, waiting ${SLEEP_DELAY} seconds..."
+        sleep $SLEEP_DELAY
+        DURATION=$(( $DURATION+$SLEEP_DELAY ))
+    fi
+done
+
+if [ -z "${PR_COMMIT}" ]; then
+  echo "Cannot get PR commit from ${GITHUB_API_PR_URL}"
+  exit 2
+fi
+
+echo "PR_COMMIT=${PR_COMMIT}"
+
+# build GITHUB_API_RUNS_URL using the COMMIT
+GITHUB_API_RUNS_URL="https://api.github.com/repos/${PROJECT}/commits/${PR_COMMIT}/check-runs"
+echo "GITHUB_API_RUNS_URL=${GITHUB_API_RUNS_URL}"
+
+# Now we try to parse URL of Testing farm job from GITHUB_API_RUNS_URL page
 TF_BASEURL=''
 while [ -z "${TF_BASEURL}" -a ${DURATION} -lt ${MAX_DURATION} ]; do
-    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_URL}" &> ${TMPFILE}
+    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_RUNS_URL}" &> ${TMPFILE}
     TF_BASEURL=$( cat ${TMPFILE} | sed -n "/${TF_JOB_DESC}/, /\"id\"/ p" | egrep -o "${TF_ARTIFACTS_URL}[^ ]*" )
     # if we have failed to parse URL, wait a bit and try again
     if [ -z "${TF_BASEURL}" ]; then
-        echo "Failed to parse Testing Farm job ${TF_JOB_DESC} URL from ${GITHUB_API_URL}, waiting ${SLEEP_DELAY} seconds..."
+        echo "Failed to parse Testing Farm job ${TF_JOB_DESC} URL from ${GITHUB_API_RUNS_URL}, waiting ${SLEEP_DELAY} seconds..."
         sleep $SLEEP_DELAY
         DURATION=$(( $DURATION+$SLEEP_DELAY ))
     fi
 done
 
 if [ -z "${TF_BASEURL}" ]; then
-  echo "Cannot parse artifacts URL for ${TF_JOB_DESC} from ${GITHUB_API_URL}"
-  exit 2
+  echo "Cannot parse artifacts URL for ${TF_JOB_DESC} from ${GITHUB_API_RUNS_URL}"
+  exit 3
 fi
 
 echo "TF_BASEURL=${TF_BASEURL}"
@@ -81,7 +109,7 @@ echo "TF_BASEURL=${TF_BASEURL}"
 TF_STATUS=''
 while [ "${TF_STATUS}" != "completed" -a ${DURATION} -lt ${MAX_DURATION} ]; do
     # parse Testing Farm job status
-    curl -s -H "Accept: application/vnd.github.v3+json" ${GITHUB_API_URL} | sed -n "/${TF_JOB_DESC}/, /\"id\"/ p" &> ${TMPFILE}
+    curl -s -H "Accept: application/vnd.github.v3+json" ${GITHUB_API_RUNS_URL} | sed -n "/${TF_JOB_DESC}/, /\"id\"/ p" &> ${TMPFILE}
     TF_STATUS=$( cat ${TMPFILE} | grep '"status"' | cut -d '"' -f 4 )
     # if status is not "completed" wait a bit and try again
     if [ "${TF_STATUS}" != "completed" ]; then
@@ -92,8 +120,8 @@ while [ "${TF_STATUS}" != "completed" -a ${DURATION} -lt ${MAX_DURATION} ]; do
 done
 
 if [ "${TF_STATUS}" != "completed" ]; then
-  echo "Testing farm job ${TF_JOB_DESC} didn't complete within $MAX_DURATION seconds ${GITHUB_API_URL}"
-  exit 3
+  echo "Testing farm job ${TF_JOB_DESC} didn't complete within $MAX_DURATION seconds ${GITHUB_API_RUNS_URL}"
+  exit 4
 fi
 
 echo "TF_STATUS=${TF_STATUS}"
@@ -112,7 +140,7 @@ for REPORT in coverage.packit.xml coverage.testsuite.xml coverage.unittests.xml;
 
     if [ -z "${COVERAGE_URL}" ]; then
         echo "Could not parse $REPORT URL at ${WEBDRIVE_URL} from test log ${TF_TESTLOG}"
-        exit 4
+        exit 5
     fi
 
     # download the file
