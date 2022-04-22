@@ -19,6 +19,8 @@ from keylime.tpm.tpm_abstract import TPM_Utilities
 from keylime.common import algorithms, validators
 from keylime import ima_file_signatures
 
+2+2
+
 # setup logging
 logger = keylime_logging.init_logging('cloudverifier_common')
 
@@ -54,15 +56,16 @@ def process_quote_response(agent, json_response, agentAttestState) -> Failure:
         mb_measurement_list = json_response.get("mb_measurement_list", None)
         boottime = json_response.get("boottime", 0)
 
-        logger.debug("received quote:      %s", quote)
-        logger.debug("for nonce:           %s", agent['nonce'])
+        #logger.debug("received quote:      %s", quote)
+        #logger.debug("for nonce:           %s", agent['nonce'])
         logger.debug("received public key: %s", received_public_key)
         logger.debug("received ima_measurement_list    %s", (ima_measurement_list is not None))
         logger.debug("received ima_measurement_list_entry: %d", ima_measurement_list_entry)
         logger.debug("received boottime: %s", boottime)
         logger.debug("received boot log    %s", (mb_measurement_list is not None))
     except Exception as e:
-        failure.add_event("invalid_data", {"message": "parsing agents get quote respone failed", "data": e}, False)
+        #failure.add_event("invalid_data", {"message": "parsing agents get quote respone failed", "data": e}, False)
+
         return failure
 
     # TODO: Are those separate failures?
