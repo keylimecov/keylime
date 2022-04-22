@@ -44,7 +44,8 @@ COMMIT=$GITHUB_SHA
 [ -n "$1" ] && COMMIT="$1"
 
 # build GITHUB_API_PR_URL using the COMMIT
-GITHUB_API_PR_URL="https://api.github.com/repos/${PROJECT}/commits/${COMMIT}/pulls"
+GITHUB_API_COMMIT_URL="https://api.github.com/repos/${PROJECT}/commits"
+GITHUB_API_PR_URL="${GITHUB_API_COMMIT_URL}/${COMMIT}/pulls"
 echo "GITHUB_API_PR_URL=${GITHUB_API_PR_URL}"
 
 # meassure approx. task duration
@@ -80,6 +81,44 @@ if [ -z "${PR_COMMIT}" ]; then
 fi
 
 echo "PR_COMMIT=${PR_COMMIT}"
+
+# now if PR_COMMIT and COMMIT differs, it means we are processing merge to master branch
+# in this case we can use PR code coverage only if the parent and base commit are equal,
+# i.e. there were no other commits added to master branch in the meantime
+
+if [ "${PR_COMMIT}" != "${COMMIT}" ]; then
+
+    echo "Provided commit ${COMMIT} differs from PR commit ${PR_COMMIT}"
+    echo "Need to verify that parent commit matches PR base commit"
+
+    # we need to get parent commit from the master branch
+    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_COMMIT_URL}/${COMMIT}" &> ${TMPFILE}
+    PARENT_COMMIT=$( cat ${TMPFILE} | grep -A 5 '"parents"' | grep '"sha"' | cut -d '"' -f 4 )
+
+    if [ -z "${PARENT_COMMIT}" ]; then
+        echo "Unable to get parent commit for ${COMMIT} from ${GITHUB_API_COMMIT_URL}/${COMMIT}"
+        exit 10
+    fi
+
+    # and also base commit from PR
+    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_COMMIT_URL}/${PR_COMMIT}/pulls" &> ${TMPFILE}
+    BASE_COMMIT=$( cat ${TMPFILE} | grep -A 5 '"base"' | grep '"sha"' | cut -d '"' -f 4 )
+
+    if [ -z "${BASE_COMMIT}" ]; then
+        echo "Unable to get base commit for ${PR_COMMIT} from ${GITHUB_API_COMMIT_URL}/${PR_COMMIT}/pulls"
+        exit 10
+    fi
+
+    # not check if these commits are the same
+    if [ "${PARENT_COMMIT}" != "${BASE_COMMIT}" ]; then
+        echo "Parent commit ${PARENT_COMMIT} differs from PR base commit ${BASE_COMMIT}"
+        echo "Code coverage data cannot be used"
+        exit 20
+    else
+        echo "Parent commit ${PARENT_COMMIT} matches PR base commit ${BASE_COMMIT}"
+    fi
+
+fi
 
 # build GITHUB_API_RUNS_URL using the COMMIT
 GITHUB_API_RUNS_URL="https://api.github.com/repos/${PROJECT}/commits/${PR_COMMIT}/check-runs"
