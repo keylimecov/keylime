@@ -1,6 +1,6 @@
 # Keylime testing
 
-## Pull-request testing AAA
+## Pull-request testing AA
 
 Individual changes to keylime are introduced using the pull-request workflow and for each pull-request update a set of test is executed.
 
