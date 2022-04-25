@@ -5,11 +5,11 @@
 ##############################################
 
 # maximum duration of the task in seconds
-MAX_DURATION=$(( 60*90 ))  # 90 minutes
+MAX_DURATION="${MAX_DURATION:-5400}"  # 90 minutes
 
 # delay in seconds before doing another URL read
 # should not be too short not to exceed GitHub API quota
-SLEEP_DELAY=120
+SLEEP_DELAY="${SLEEP_DELAY:-120}"
 
 # github user/project we are going to work with
 #PROJECT="keylime/keylime"
@@ -43,10 +43,9 @@ fi
 COMMIT=$GITHUB_SHA
 [ -n "$1" ] && COMMIT="$1"
 
-# build GITHUB_API_PR_URL using the COMMIT
-GITHUB_API_COMMIT_URL="https://api.github.com/repos/${PROJECT}/commits"
-GITHUB_API_PR_URL="${GITHUB_API_COMMIT_URL}/${COMMIT}/pulls"
-echo "GITHUB_API_PR_URL=${GITHUB_API_PR_URL}"
+# build GITHUB_API_PR_URLs
+GITHUB_API_PREFIX_URL="https://api.github.com/repos/${PROJECT}"
+GITHUB_API_COMMIT_URL="${GITHUB_API_PREFIX_URL}/commits"
 
 # meassure approx. task duration
 DURATION=0
@@ -63,6 +62,7 @@ TMPFILE=$( mktemp )
 # Here we try to find the commit from PR branch since this is the commit
 # for which tests have been run.
 
+GITHUB_API_PR_URL="${GITHUB_API_COMMIT_URL}/${COMMIT}/pulls"
 PR_COMMIT=''
 while [ -z "${PR_COMMIT}" -a ${DURATION} -lt ${MAX_DURATION} ]; do
     curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_PR_URL}" &> ${TMPFILE}
@@ -91,6 +91,7 @@ if [ "${PR_COMMIT}" != "${COMMIT}" ]; then
     echo "Provided commit ${COMMIT} differs from PR commit ${PR_COMMIT}"
     echo "Need to verify that parent commit matches PR base commit"
 
+    GITHUB_API_PR_URL="${GITHUB_API_COMMIT_URL}/${PR_COMMIT}/pulls"
     # we need to get parent commit from the master branch
     curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_COMMIT_URL}/${COMMIT}" &> ${TMPFILE}
     PARENT_COMMIT=$( cat ${TMPFILE} | grep -A 5 '"parents"' | grep '"sha"' | cut -d '"' -f 4 )
@@ -101,11 +102,11 @@ if [ "${PR_COMMIT}" != "${COMMIT}" ]; then
     fi
 
     # and also base commit from PR
-    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_COMMIT_URL}/${PR_COMMIT}/pulls" &> ${TMPFILE}
+    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_PR_URL}" &> ${TMPFILE}
     BASE_COMMIT=$( cat ${TMPFILE} | grep -A 5 '"base"' | grep '"sha"' | cut -d '"' -f 4 )
 
     if [ -z "${BASE_COMMIT}" ]; then
-        echo "Unable to get base commit for ${PR_COMMIT} from ${GITHUB_API_COMMIT_URL}/${PR_COMMIT}/pulls"
+        echo "Unable to get base commit for ${PR_COMMIT} from ${GITHUB_API_PR_URL}"
         exit 10
     fi
 
@@ -164,6 +165,16 @@ if [ "${TF_STATUS}" != "completed" ]; then
 fi
 
 echo "TF_STATUS=${TF_STATUS}"
+
+# check test results - we won't proceed if test failed since coverage data may be incomplete,
+# see https://docs.codecov.com/docs/comparing-commits#commits-with-failed-ci
+TF_RESULT=$( cat ${TMPFILE} | grep '"conclusion"' | cut -d '"' -f 4 )
+echo TF_RESULT=${TF_RESULT}
+
+if [ "${TF_RESULT}" != "success" ]; then
+    echo "Testing Farm tests failed, we won't be uploading coverage data since they may be incomplete"
+    return 30
+fi
 
 # wait a bit since there could be some timing issue
 sleep 10

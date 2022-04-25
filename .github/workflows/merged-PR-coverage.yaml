@@ -16,6 +16,9 @@ jobs:
     - uses: actions/checkout@v3
     - name: Find PR Packit tests to finish and download coverage.xml file
       run: ./download_packit_coverage.sh ${{ github.event.pull_request.head.sha }}
+      env:
+        MAX_DURATION: 300
+        SLEEP_DELAY: 20
     - name: List downloaded files
       run: ls
     - name: Upload coverage.unittests.xml report to Codecov with GitHub Action
