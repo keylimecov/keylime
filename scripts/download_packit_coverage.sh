@@ -55,6 +55,8 @@ GITHUB_API_COMMIT_URL="${GITHUB_API_PREFIX_URL}/commits"
 # meassure approx. task duration
 DURATION=0
 
+TMPFILE=$( mktemp )
+
 ####################################
 # some functions we are going to use
 ####################################
@@ -71,10 +73,11 @@ function do_GitHub_API_call() {
     local ERROR_MSG="$3"
     local EXP_VALUE="$4"
     local VALUE=''
-    local TMPFILE=$( mktemp )
 
     while [ -z "${VALUE}" -o \( -n "${EXP_VALUE}" -a "${VALUE}" != "${EXP_VALUE}" \) ] && [ ${DURATION} -lt ${MAX_DURATION} ]; do
-        curl -s -H "Accept: application/vnd.github.v3+json" "$URL" &> ${TMPFILE}
+        if [ "$URL" != "-" ]; then  # when URL='-', we reuse data downloaded previously
+            curl -s -H "Accept: application/vnd.github.v3+json" "$URL" &> ${TMPFILE}
+        fi
         VALUE=$( cat ${TMPFILE} | jq "${JQ_REF}" | sed 's/"//g' )
         if [ -z "${VALUE}" ] || [ -n "${EXP_VALUE}" -a "${VALUE}" != "${EXP_VALUE}" ]; then
             if [ -z "${ERROR_MSG}" ]; then
@@ -92,7 +95,6 @@ function do_GitHub_API_call() {
          exit 9
     fi
 
-    rm ${TMPFILE}
     echo $VALUE
 }
 
@@ -100,8 +102,69 @@ function do_GitHub_API_call() {
 # now start with the actual processing
 ######################################
 
+# First we need to get the actual HEAD commit from PR.
+# On GitHub commit always changes when doing rebase and merge
+# and therefore commit differs between the PR branch and master branch
+# Here we try to find the commit from PR branch since this is the commit
+# for which tests have been run.
+
+GITHUB_API_PR_URL="${GITHUB_API_COMMIT_URL}/${COMMIT}/pulls"
+PR_HEAD_COMMIT=$( do_GitHub_API_call "${GITHUB_API_PR_URL}" \
+                                 ".[0].head.sha" \
+                                 "Failed to get PR HEAD commit from ${GITHUB_API_PR_URL}, trying again after ${SLEEP_DELAY} seconds..." )
+echo PR_HEAD_COMMIT=${PR_HEAD_COMMIT}
+
+PR_BASE_COMMIT=$( do_GitHub_API_call "-" \
+                                 ".[0].base.sha" )
+echo PR_BASE_COMMIT=${PR_BASE_COMMIT}
+
+PR_PROJECT=$( do_GitHub_API_call "-" \
+                                 ".[0].head.repo.full_name" )
+echo PR_PROJECT=${PR_PROJECT}
+
+# now if PR_HEAD_COMMIT and COMMIT differ, it means we are processing merge to master branch
+# in this case we can use PR code coverage only if the parent and base commit are equal,
+# i.e. there were no other commits added to master branch in the meantime
+
+if [ "${PR_HEAD_COMMIT}" != "${COMMIT}" ]; then
+
+    echo "Provided commit ${COMMIT} differs from PR commit ${PR_HEAD_COMMIT}"
+    echo "Need to verify that there were no other change merged in the mean time"
+    echo "and point to the original PR project and commit"
+
+    # now we need to check that there were no other changes merged, otherwise
+    # code coverage data would be outdated and we should not use them
+    # we do that by checking that all commits between PR HEAD and base refer to the same PR
+    TMP_COMMIT=${COMMIT}
+    PR_LIST=$( mktemp )
+    while [ "$TMP_COMMIT" != "${PR_BASE_COMMIT}" ]; do
+        PR=$( do_GitHub_API_call "${GITHUB_API_COMMIT_URL}/${TMP_COMMIT}/pulls" \
+                                 '.[0].url' \
+                                 "Cannot get PR URL for commit ${TMP_COMMIT} from ${GITHUB_API_COMMIT_URL}/${TMP_COMMIT}/pulls, trying again in ${SLEEP_DELAY} seconds..." )
+        echo ${PR} >> ${PR_LIST}
+        # now move to the parent commit
+        TMP_COMMIT=$( do_GitHub_API_call "${GITHUB_API_COMMIT_URL}/${TMP_COMMIT}" \
+                                 ' .parents[0].sha ' \
+                                 "Cannot get parent commit for commit ${TMP_COMMIT} from ${GITHUB_API_COMMIT_URL}/${TMP_COMMIT}, trying again in ${SLEEP_DELAY} seconds..." )
+    done
+
+    echo "PRs merged since commit ${COMMIT} PR base ${PR_BASE_COMMIT}:"
+    cat ${PR_LIST}
+    # now check the list to confirm there is just a single PR listed
+    if [ $( sort ${PR_LIST} | wc -l ) -gt 1 ]; then
+        echo "Error: There were other PR's merged in the mean time, coverage data cannot be re-used"
+        exit 5
+    fi
+    rm ${PR_LIST}
+
+    # update GITHUB_API_URLs
+    GITHUB_API_PREFIX_URL="https://api.github.com/repos/${PR_PROJECT}"
+    GITHUB_API_COMMIT_URL="${GITHUB_API_PREFIX_URL}/commits"
+
+fi
+
 # build GITHUB_API_RUNS_URL using the COMMIT
-GITHUB_API_RUNS_URL="${GITHUB_API_COMMIT_URL}/${COMMIT}/check-runs?check_name=${TF_JOB_DESC}"
+GITHUB_API_RUNS_URL="${GITHUB_API_COMMIT_URL}/${PR_HEAD_COMMIT}/check-runs?check_name=${TF_JOB_DESC}"
 echo "GITHUB_API_RUNS_URL=${GITHUB_API_RUNS_URL}"
 
 # Now we try to parse URL of Testing farm job from GITHUB_API_RUNS_URL page
@@ -137,7 +200,6 @@ TF_TESTLOG=$( curl -s ${TF_BASEURL}/results.xml | egrep -o "${TF_ARTIFACTS_URL}.
 echo "TF_TESTLOG=${TF_TESTLOG}"
 
 # parse the URL of coverage XML file on WEBDRIVE_URL and download it
-TMPFILE=$( mktemp )
 curl -s "${TF_TESTLOG}" &> ${TMPFILE}
 for REPORT in coverage.packit.xml coverage.testsuite.xml coverage.unittests.xml; do
     COVERAGE_URL=$( grep "$REPORT report is available at" ${TMPFILE} | grep -o "${WEBDRIVE_URL}.*\.xml" )
