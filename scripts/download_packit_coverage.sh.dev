@@ -11,6 +11,10 @@ MAX_DURATION="${MAX_DURATION:-5400}"  # 90 minutes
 # should not be too short not to exceed GitHub API quota
 SLEEP_DELAY="${SLEEP_DELAY:-120}"
 
+# github user/project we are going to work with
+#PROJECT="keylime/keylime"
+PROJECT="keylimecov/keylime"
+
 # TF_JOB_DESC points to a Testing farm job that does code coverage measurement and 
 # uploads coverage XML files to a web drive
 # currently we are doing that in a job running tests on Fedora-35
@@ -30,25 +34,16 @@ WEBDRIVE_URL="https://transfer.sh/"
 # no need to change anything below
 ##################################
 
-# COMMIT is necessary so we can access the GITHUB API URL to read check runs status
 if [ -z "$GITHUB_SHA" -a -z "$1" ]; then
   echo "Commit SHA is required as an argument or in GITHUB_SHA environment variable"
   exit 1
 fi
-COMMIT="${GITHUB_SHA}"
+
+# COMMIT is necessary so we can access the GITHUB API URL to read check runs status
+COMMIT=$GITHUB_SHA
 [ -n "$1" ] && COMMIT="$1"
-echo "COMMIT=${COMMIT}"
 
-# github project is also necessary so we can build API URL
-if [ -z "${GITHUB_REPOSITORY}" -a -z "$2" ]; then
-  echo "GitHub repository name USER/PROJECT is required as an argument or in GITHUB_REPOSITORY environment variable"
-  exit 1
-fi
-PROJECT="${GITHUB_REPOSITORY}"
-[ -n "$2" ] && PROJECT="$2"
-echo "PROJECT=${PROJECT}"
-
-# build GITHUB_API_URLs
+# build GITHUB_API_PR_URLs
 GITHUB_API_PREFIX_URL="https://api.github.com/repos/${PROJECT}"
 GITHUB_API_COMMIT_URL="${GITHUB_API_PREFIX_URL}/commits"
 
@@ -61,8 +56,73 @@ TMPFILE=$( mktemp )
 # now start with the actual processing
 ######################################
 
+# First we need to get the actual HEAD commit from PR.
+# On GitHub commit always changes when doing rebase and merge
+# and therefore commit differs between the PR branch and master branch
+# Here we try to find the commit from PR branch since this is the commit
+# for which tests have been run.
+
+GITHUB_API_PR_URL="${GITHUB_API_COMMIT_URL}/${COMMIT}/pulls"
+PR_COMMIT=''
+while [ -z "${PR_COMMIT}" -a ${DURATION} -lt ${MAX_DURATION} ]; do
+    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_PR_URL}" &> ${TMPFILE}
+    PR_COMMIT=$( cat ${TMPFILE} | grep '"sha"' | head -1 | cut -d '"' -f 4 )
+    # if we have failed to parse PR_COMMIT, wait a bit and try again
+    if [ -z "${PR_COMMIT}" ]; then
+        echo "Failed to parse PR commit from ${GITHUB_API_PR_URL}, waiting ${SLEEP_DELAY} seconds..."
+        sleep $SLEEP_DELAY
+        DURATION=$(( $DURATION+$SLEEP_DELAY ))
+    fi
+done
+
+if [ -z "${PR_COMMIT}" ]; then
+  echo "Cannot get PR commit from ${GITHUB_API_PR_URL}"
+  exit 2
+fi
+
+echo "PR_COMMIT=${PR_COMMIT}"
+
+# now if PR_COMMIT and COMMIT differs, it means we are processing merge to master branch
+# in this case we can use PR code coverage only if the parent and base commit are equal,
+# i.e. there were no other commits added to master branch in the meantime
+
+if [ "${PR_COMMIT}" != "${COMMIT}" ]; then
+
+    echo "Provided commit ${COMMIT} differs from PR commit ${PR_COMMIT}"
+    echo "Need to verify that parent commit matches PR base commit"
+
+    GITHUB_API_PR_URL="${GITHUB_API_COMMIT_URL}/${PR_COMMIT}/pulls"
+    # we need to get parent commit from the master branch
+    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_COMMIT_URL}/${COMMIT}" &> ${TMPFILE}
+    PARENT_COMMIT=$( cat ${TMPFILE} | grep -A 5 '"parents"' | grep '"sha"' | cut -d '"' -f 4 )
+
+    if [ -z "${PARENT_COMMIT}" ]; then
+        echo "Unable to get parent commit for ${COMMIT} from ${GITHUB_API_COMMIT_URL}/${COMMIT}"
+        exit 10
+    fi
+
+    # and also base commit from PR
+    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_PR_URL}" &> ${TMPFILE}
+    BASE_COMMIT=$( cat ${TMPFILE} | grep -A 5 '"base"' | grep '"sha"' | cut -d '"' -f 4 )
+
+    if [ -z "${BASE_COMMIT}" ]; then
+        echo "Unable to get base commit for ${PR_COMMIT} from ${GITHUB_API_PR_URL}"
+        exit 10
+    fi
+
+    # not check if these commits are the same
+    if [ "${PARENT_COMMIT}" != "${BASE_COMMIT}" ]; then
+        echo "Parent commit ${PARENT_COMMIT} differs from PR base commit ${BASE_COMMIT}"
+        echo "Code coverage data cannot be used"
+        exit 20
+    else
+        echo "Parent commit ${PARENT_COMMIT} matches PR base commit ${BASE_COMMIT}"
+    fi
+
+fi
+
 # build GITHUB_API_RUNS_URL using the COMMIT
-GITHUB_API_RUNS_URL="${GITHUB_API_COMMIT_URL}/${COMMIT}/check-runs"
+GITHUB_API_RUNS_URL="https://api.github.com/repos/${PROJECT}/commits/${PR_COMMIT}/check-runs"
 echo "GITHUB_API_RUNS_URL=${GITHUB_API_RUNS_URL}"
 
 # Now we try to parse URL of Testing farm job from GITHUB_API_RUNS_URL page
