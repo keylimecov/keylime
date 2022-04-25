@@ -11,6 +11,8 @@ jobs:
         working-directory: scripts
     steps:
     - uses: actions/checkout@v3
+    - name: git log
+      run: git log --oneline | head
     - name: Wait for Packit tests to finish and download coverage.xml file
       run: ./download_packit_coverage.sh ${{ github.event.pull_request.head.sha }}
       env:

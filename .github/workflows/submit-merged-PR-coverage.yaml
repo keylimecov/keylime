@@ -14,8 +14,10 @@ jobs:
         working-directory: scripts
     steps:
     - uses: actions/checkout@v3
+    - name: git log
+      run: git log --oneline | head
     - name: Find PR Packit tests to finish and download coverage.xml file
-      run: ./download_packit_coverage.sh ${{ github.event.pull_request.head.sha }}
+      run: ./download_packit_coverage.sh ${{ github.event.pull_request.head.sha }}; exit 0
       env:
         MAX_DURATION: 300
         SLEEP_DELAY: 20
@@ -36,6 +38,3 @@ jobs:
       with:
         files: scripts/coverage.packit.xml
         flags: packit-e2e
-    - name: always pass to avoid sending notifications
-      run: exit 0
-      if: ${{ always() }}
