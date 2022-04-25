@@ -37,5 +37,5 @@ jobs:
         files: scripts/coverage.packit.xml
         flags: packit-e2e
     - name: always pass to avoid sending notifications
-      exit: success()
-      if: failure()
+      run: exit 0
+      if: ${{ always() }}
