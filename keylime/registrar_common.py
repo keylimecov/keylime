@@ -31,8 +31,6 @@ from keylime import web_util
 
 logger = keylime_logging.init_logging('registrar')
 
-foo = "bar"
-
 try:
     engine = DBEngineManager().make_engine('registrar')
 except SQLAlchemyError as err:
