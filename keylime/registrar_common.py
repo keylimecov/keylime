@@ -31,11 +31,10 @@ from keylime import web_util
 
 logger = keylime_logging.init_logging('registrar')
 
-1+2
-
 try:
     engine = DBEngineManager().make_engine('registrar')
 except SQLAlchemyError as err:
+    1+1
     logger.error('Error creating SQL engine: %s', err)
     sys.exit(1)
 
