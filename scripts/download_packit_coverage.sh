@@ -21,10 +21,10 @@ TF_JOB_DESC="testing-farm:fedora-35-x86_64"
 TF_TEST_OUTPUT="/setup/generate_coverage_report/output.txt"
 
 # TF_ARTIFACTS_URL is URL prefix of Testing farm test artifacts
-TF_ARTIFACTS_URL="https://artifacts.dev.testing-farm.io/"
+TF_ARTIFACTS_URL="https://artifacts.dev.testing-farm.io"
 
 # WEBDRIVE_URL points to a web page that stores coverage XML files
-WEBDRIVE_URL="https://transfer.sh/"
+WEBDRIVE_URL="https://transfer.sh"
 
 ##################################
 # no need to change anything below
@@ -55,77 +55,92 @@ GITHUB_API_COMMIT_URL="${GITHUB_API_PREFIX_URL}/commits"
 # meassure approx. task duration
 DURATION=0
 
-TMPFILE=$( mktemp )
+####################################
+# some functions we are going to use
+####################################
+
+# run API call and parse the required value
+# repeat until we get the value or exceed job duration
+# URL - API URL
+# JQ_REF - code for jq that will be used for JSON parsing
+# ERROR_MSG - error message to print in case we fail to parse the value
+# EXP_VALUE - expected value (used e.g. when waiting for job completion)
+function do_GitHub_API_call() {
+    local URL="$1"
+    local JQ_REF="$2"
+    local ERROR_MSG="$3"
+    local EXP_VALUE="$4"
+    local VALUE=''
+    local TMPFILE=$( mktemp )
+
+    while [ -z "${VALUE}" -o \( -n "${EXP_VALUE}" -a "${VALUE}" != "${EXP_VALUE}" \) ] && [ ${DURATION} -lt ${MAX_DURATION} ]; do
+        curl -s -H "Accept: application/vnd.github.v3+json" "$URL" &> ${TMPFILE}
+        VALUE=$( cat ${TMPFILE} | jq "${JQ_REF}" | sed 's/"//g' )
+        if [ -z "${VALUE}" ] || [ -n "${EXP_VALUE}" -a "${VALUE}" != "${EXP_VALUE}" ]; then
+            if [ -z "${ERROR_MSG}" ]; then
+                echo "Warning: Failed to read data using GitHub API, trying again after ${SLEEP_DELAY} seconds" 1>&2
+            else
+                echo "$ERROR_MSG" 1>&2
+            fi
+            sleep ${SLEEP_DELAY}
+            DURATION=$(( ${DURATION}+${SLEEP_DELAY} ))
+        fi
+    done
+
+    if [ ${DURATION} -ge ${MAX_DURATION} ]; then
+         echo "Error: Maximum job diration exceeded. Terminating" 1>&2
+         exit 9
+    fi
+
+    rm ${TMPFILE}
+    echo $VALUE
+}
 
 ######################################
 # now start with the actual processing
 ######################################
 
 # build GITHUB_API_RUNS_URL using the COMMIT
-GITHUB_API_RUNS_URL="${GITHUB_API_COMMIT_URL}/${COMMIT}/check-runs"
+GITHUB_API_RUNS_URL="${GITHUB_API_COMMIT_URL}/${COMMIT}/check-runs?check_name=${TF_JOB_DESC}"
 echo "GITHUB_API_RUNS_URL=${GITHUB_API_RUNS_URL}"
 
 # Now we try to parse URL of Testing farm job from GITHUB_API_RUNS_URL page
-TF_BASEURL=''
-while [ -z "${TF_BASEURL}" -a ${DURATION} -lt ${MAX_DURATION} ]; do
-    curl -s -H "Accept: application/vnd.github.v3+json" "${GITHUB_API_RUNS_URL}" &> ${TMPFILE}
-    TF_BASEURL=$( cat ${TMPFILE} | sed -n "/${TF_JOB_DESC}/, /\"id\"/ p" | egrep -o "${TF_ARTIFACTS_URL}[^ ]*" )
-    # if we have failed to parse URL, wait a bit and try again
-    if [ -z "${TF_BASEURL}" ]; then
-        echo "Failed to parse Testing Farm job ${TF_JOB_DESC} URL from ${GITHUB_API_RUNS_URL}, waiting ${SLEEP_DELAY} seconds..."
-        sleep $SLEEP_DELAY
-        DURATION=$(( $DURATION+$SLEEP_DELAY ))
-    fi
-done
-
-if [ -z "${TF_BASEURL}" ]; then
-  echo "Cannot parse artifacts URL for ${TF_JOB_DESC} from ${GITHUB_API_RUNS_URL}"
-  exit 3
-fi
-
+TF_BASEURL=$( do_GitHub_API_call "${GITHUB_API_RUNS_URL}" \
+                                 ".check_runs[0] | .output.summary | match(\"${TF_ARTIFACTS_URL}/[^ ]*\") | .string" \
+                                 "Failed to parse Testing Farm job ${TF_JOB_DESC} URL from ${GITHUB_API_RUNS_URL}, trying again after ${SLEEP_DELAY} seconds..." )
 echo "TF_BASEURL=${TF_BASEURL}"
 
 # now we wait for the Testing farm job to finish
-TF_STATUS=''
-while [ "${TF_STATUS}" != "completed" -a ${DURATION} -lt ${MAX_DURATION} ]; do
-    # parse Testing Farm job status
-    curl -s -H "Accept: application/vnd.github.v3+json" ${GITHUB_API_RUNS_URL} | sed -n "/${TF_JOB_DESC}/, /\"id\"/ p" &> ${TMPFILE}
-    TF_STATUS=$( cat ${TMPFILE} | grep '"status"' | cut -d '"' -f 4 )
-    # if status is not "completed" wait a bit and try again
-    if [ "${TF_STATUS}" != "completed" ]; then
-        echo "Testing Farm job status: ${TF_STATUS}, waiting ${SLEEP_DELAY} seconds..."
-        sleep ${SLEEP_DELAY}
-        DURATION=$(( $DURATION+$SLEEP_DELAY ))
-    fi
-done
-
-if [ "${TF_STATUS}" != "completed" ]; then
-  echo "Testing farm job ${TF_JOB_DESC} didn't complete within $MAX_DURATION seconds ${GITHUB_API_RUNS_URL}"
-  exit 4
-fi
-
+TF_STATUS=$( do_GitHub_API_call "${GITHUB_API_RUNS_URL}" \
+                                 '.check_runs[0] | .status' \
+                                 "Testing Farm job ${TF_JOB_DESC} hasn't completed yet, trying again after ${SLEEP_DELAY} seconds..." \
+                                 "completed" )
 echo "TF_STATUS=${TF_STATUS}"
-
+                                
 # check test results - we won't proceed if test failed since coverage data may be incomplete,
 # see https://docs.codecov.com/docs/comparing-commits#commits-with-failed-ci
-TF_RESULT=$( cat ${TMPFILE} | grep '"conclusion"' | cut -d '"' -f 4 )
+TF_RESULT=$( do_GitHub_API_call "${GITHUB_API_RUNS_URL}" \
+                                 '.check_runs[0] | .conclusion' \
+                                 "Cannot get Testing Farm job ${TF_JOB_DESC} result, trying again after ${SLEEP_DELAY} seconds..." )
 echo TF_RESULT=${TF_RESULT}
 
 if [ "${TF_RESULT}" != "success" ]; then
     echo "Testing Farm tests failed, we won't be uploading coverage data since they may be incomplete"
-    return 30
+    return 3
 fi
 
 # wait a bit since there could be some timing issue
 sleep 10
 
-# now we read the test log
+# now we read the actual test log URL
 TF_TESTLOG=$( curl -s ${TF_BASEURL}/results.xml | egrep -o "${TF_ARTIFACTS_URL}.*${TF_TEST_OUTPUT}" )
 echo "TF_TESTLOG=${TF_TESTLOG}"
 
 # parse the URL of coverage XML file on WEBDRIVE_URL and download it
+TMPFILE=$( mktemp )
+curl -s "${TF_TESTLOG}" &> ${TMPFILE}
 for REPORT in coverage.packit.xml coverage.testsuite.xml coverage.unittests.xml; do
-    COVERAGE_URL=$( curl -s "${TF_TESTLOG}" | grep "$REPORT report is available at" | grep -o "${WEBDRIVE_URL}.*\.xml" )
+    COVERAGE_URL=$( grep "$REPORT report is available at" ${TMPFILE} | grep -o "${WEBDRIVE_URL}.*\.xml" )
     echo "COVERAGE_URL=${COVERAGE_URL}"
 
     if [ -z "${COVERAGE_URL}" ]; then
@@ -136,5 +151,4 @@ for REPORT in coverage.packit.xml coverage.testsuite.xml coverage.unittests.xml;
     # download the file
     curl -O ${COVERAGE_URL}
 done
-
 rm ${TMPFILE}
