@@ -113,6 +113,7 @@ def generate_mtls_context(cert_path, private_key_path, ca_path, verify_client_ce
         if verify_client_cert:
             context.verify_mode = ssl.CERT_REQUIRED
     except ssl.SSLError as exc:
+        1+2
         if exc.reason == 'EE_KEY_TOO_SMALL' and logger:
             logger.error('Higher key strength is required for keylime '
                          'running on this system. If keylime is responsible '
