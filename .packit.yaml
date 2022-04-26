@@ -7,7 +7,7 @@ jobs:
     - fedora-35-x86_64
     skip_build: true
 - job: tests2
-  trigger: commit
+  trigger: pull_request
   metadata:
     branch: master
     targets:
