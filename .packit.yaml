@@ -1,6 +1,6 @@
 jobs:
 
-- job: PR_tests
+- job: pr_tests
   trigger: pull_request
   metadata:
     targets:
