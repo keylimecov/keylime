@@ -6,3 +6,11 @@ jobs:
     - fedora-34-x86_64
     - fedora-35-x86_64
     skip_build: true
+- job: tests2
+  trigger: commit
+  metadata:
+    branch: master
+    targets:
+    - fedora-34-x86_64
+    - fedora-35-x86_64
+    skip_build: true
