@@ -101,6 +101,7 @@ def init_mtls(section='cloud_verifier', generatedir='cv_ca', logger=None):
 def generate_mtls_context(cert_path, private_key_path, ca_path, verify_client_cert=True,
                           private_key_password=None, ssl_purpose=ssl.Purpose.CLIENT_AUTH, logger=None):
     try:
+        1+1
         context = ssl.create_default_context(ssl_purpose)
         context.check_hostname = False  # We do not use hostnames as part of our authentication
         if sys.version_info >= (3, 7):
