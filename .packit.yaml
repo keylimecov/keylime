@@ -1,15 +1,17 @@
 jobs:
+
 - job: PR_tests
   trigger: pull_request
   metadata:
     targets:
-    - fedora-35-x86_64
-    - fedora-34-x86_64
+     - fedora-35-x86_64
+     - fedora-34-x86_64
     skip_build: true
-- job: code_coverage_for_merged_commit
-  trigger: commit
-  metadata:
-    branch: master
-    targets:
-    - fedora-35-x86_64
-    skip_build: true
+
+#- job: code_coverage_for_merged_commit
+#  trigger: commit
+#  metadata:
+#    branch: master
+#    targets:
+#     - fedora-35-x86_64
+#    skip_build: true
