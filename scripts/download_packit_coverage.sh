@@ -102,30 +102,47 @@ function do_GitHub_API_call() {
 # now start with the actual processing
 ######################################
 
-# We need to get the actual HEAD commit from PR.
+# First we need to check if we are processing PR or a merged commit
+# let's try to find some open PRs
+
 # On GitHub commit always changes when doing rebase and merge
 # and therefore commit differs between the PR branch and master branch
 # Here we try to find the commit from PR branch since this is the commit
 # for which tests have been run.
 
-GITHUB_API_PR_URL="${GITHUB_API_PREFIX_URL}/pulls?commit=${COMMIT}"
+OPEN_PULLS=$( mktemp )
+do_GitHub_API_call "${GITHUB_API_PREFIX_URL}/pulls" \
+                   '.[] | .head.sha, .base.sha, .url, .head.repo.full_name' \
+| tr ' ' '\n' > ${OPEN_PULLS}
+
+if grep -q ${COMMIT} ${OPEN_PULLS}; then
+    # we are processing PR.
+    echo "We are processing PR"
+    PR_HEAD_COMMIT=${COMMIT}
+    PR_BASE_COMMIT=$( grep -A 1 "${COMMIT}" ${OPEN_PULLS} | tail -1 )
+    GITHUB_API_PR_URL=$( grep -A 2 "${COMMIT}" ${OPEN_PULLS} | tail -1 )
+    PR_PROJECT=$( grep -A 3 "${COMMIT}" ${OPEN_PULLS} | tail -1 )
+else
+    # we are processing merged commit
+    echo "We are processing merged commit"
+    GITHUB_API_PR_URL="${GITHUB_API_COMMIT_URL}/${COMMIT}/pulls"
+    PR_HEAD_COMMIT=$( do_GitHub_API_call "${GITHUB_API_PR_URL}" \
+                                         ".[0].head.sha" \
+                                         "Failed to get PR HEAD commit from ${GITHUB_API_PR_URL}, trying again after ${SLEEP_DELAY} seconds..." )
+
+    PR_PROJECT=$( do_GitHub_API_call "-" \
+                                     ".[0].head.repo.full_name" \
+                                     "Failed to get PR HEAD repo name from ${GITHUB_API_PR_URL}, trying again after ${SLEEP_DELAY} seconds..." )
+
+    PR_BASE_COMMIT=$( do_GitHub_API_call "-" \
+                                         ".[0].base.sha" )
+fi
+
 echo "GITHUB_API_PR_URL=${GITHUB_API_PR_URL}"
-
-cat /tmp/pc > ${TMPFILE}
-PR_HEAD_COMMIT=$( do_GitHub_API_call "${GITHUB_API_PR_URL}" \
-                                 ".[0].head.sha" \
-                                 "Failed to get PR HEAD commit from ${GITHUB_API_PR_URL}, trying again after ${SLEEP_DELAY} seconds..." )
-echo PR_HEAD_COMMIT=${PR_HEAD_COMMIT}
-
-# now parse few additional details
-PR_PROJECT=$( do_GitHub_API_call "-" \
-                                 ".[0].head.repo.full_name" \
-                                 "Failed to get PR HEAD repo name from ${GITHUB_API_PR_URL}, trying again after ${SLEEP_DELAY} seconds..." )
+echo "PR_HEAD_COMMIT=${PR_HEAD_COMMIT}"
 echo "PR_PROJECT=${PR_PROJECT}"
+echo "PR_BASE_COMMIT=${PR_BASE_COMMIT}"
 
-PR_BASE_COMMIT=$( do_GitHub_API_call "-" \
-                                     ".[0].base.sha" )
-echo PR_BASE_COMMIT=${PR_BASE_COMMIT}
 
 # now if PR_HEAD_COMMIT and COMMIT differ, it means we are processing merge to master branch
 # in this case we can use PR code coverage only if the parent and base commit are equal,
@@ -142,14 +159,14 @@ if [ "${PR_HEAD_COMMIT}" != "${COMMIT}" ]; then
     TMP_COMMIT=${COMMIT}
     PR_LIST=$( mktemp )
     while [ "$TMP_COMMIT" != "${PR_BASE_COMMIT}" ]; do
-        PR=$( do_GitHub_API_call "${GITHUB_API_PR_COMMIT_URL}/${TMP_COMMIT}/pulls" \
+        PR=$( do_GitHub_API_call "${GITHUB_API_COMMIT_URL}/${TMP_COMMIT}/pulls" \
                                  '.[0].url' \
-                                 "Cannot get PR URL for commit ${TMP_COMMIT} from ${GITHUB_API_PR_COMMIT_URL}/${TMP_COMMIT}/pulls, trying again in ${SLEEP_DELAY} seconds..." )
+                                 "Cannot get PR URL for commit ${TMP_COMMIT} from ${GITHUB_API_COMMIT_URL}/${TMP_COMMIT}/pulls, trying again in ${SLEEP_DELAY} seconds..." )
         echo ${PR} >> ${PR_LIST}
         # now move to the parent commit
-        TMP_COMMIT=$( do_GitHub_API_call "${GITHUB_API_PR_COMMIT_URL}/${TMP_COMMIT}" \
+        TMP_COMMIT=$( do_GitHub_API_call "${GITHUB_API_COMMIT_URL}/${TMP_COMMIT}" \
                                  ' .parents[0].sha ' \
-                                 "Cannot get parent commit for commit ${TMP_COMMIT} from ${GITHUB_API_PR_COMMIT_URL}/${TMP_COMMIT}, trying again in ${SLEEP_DELAY} seconds..." )
+                                 "Cannot get parent commit for commit ${TMP_COMMIT} from ${GITHUB_API_COMMIT_URL}/${TMP_COMMIT}, trying again in ${SLEEP_DELAY} seconds..." )
     done
 
     echo "PRs merged since commit ${COMMIT} PR base ${PR_BASE_COMMIT}:"
@@ -160,10 +177,6 @@ if [ "${PR_HEAD_COMMIT}" != "${COMMIT}" ]; then
         exit 5
     fi
     rm ${PR_LIST}
-
-    # update GITHUB_API_URLs
-    #GITHUB_API_PREFIX_URL="https://api.github.com/repos/${PR_PROJECT}"
-    #GITHUB_API_COMMIT_URL="${GITHUB_API_PREFIX_URL}/commits"
 
 fi
 
