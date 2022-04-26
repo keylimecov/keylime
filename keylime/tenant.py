@@ -5,8 +5,8 @@ SPDX-License-Identifier: Apache-2.0
 Copyright 2017 Massachusetts Institute of Technology.
 '''
 
-import argparse
 import base64
+import argparse
 import hashlib
 import io
 import logging
