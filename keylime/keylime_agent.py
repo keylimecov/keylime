@@ -5,6 +5,7 @@ SPDX-License-Identifier: Apache-2.0
 Copyright 2017 Massachusetts Institute of Technology.
 '''
 
+1
 import asyncio
 import http.server
 import multiprocessing
@@ -243,6 +244,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, KeyError, TypeError) as e:
             logger.warning('POST returning 400 response, could not parse body data: %s', e)
             web_util.echo_json_response(self, 400, "content is invalid")
+            4
             return
 
         have_derived_key = False
