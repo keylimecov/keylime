@@ -14,10 +14,8 @@ jobs:
         working-directory: scripts
     steps:
     - uses: actions/checkout@v3
-    - name: Update python-pip
-      run: apt-get update && apt-get upgrade python-pip
     - name: Install testing-farm using pip
-      run: pip install --user tft-cli
+      run: pip install tft-cli
     - name: Run tests on Testing Farm
       run : testing-farm request --context distro=fedora-35 --arch x86_64 --compose Fedora-35 --plan 'e2e-with-revocation' -e PACKIT_SOURCE_URL=defined-just-to-upload-coverage-files &> tt_output
     - name: Find PR Packit tests to finish and download coverage.xml file
