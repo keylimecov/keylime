@@ -10,7 +10,7 @@ elif [ "$1" == "--github-sha" -a -n "$2" ]; then
 elif [ -n "$GITHUB_SHA" ]; then
     :
 else
-    echo "Neither --github-sha nor --artifacts-url arguments were provided"
+    echo "Neither --github-sha nor --artifacts-url nor --testing-farm-log arguments were provided"
     exit 1
 fi
 
@@ -90,7 +90,7 @@ function do_GitHub_API_call() {
 
 # if the GitHub Action has been triggered by a PR, 
 # we need to find Testing farm test results through GitHub API
-if [ -n "${GITHUB_SHA}" -a -z "${TF_ARTIFACTS_URL}" ]; then
+if [ -n "${GITHUB_SHA}" -a -z "${TF_ARTIFACTS_URL}" -z "${TT_LOG}" ]; then
 
     echo "Trying to find Testing Farm / Packig CI test results using GitHub API"
 
