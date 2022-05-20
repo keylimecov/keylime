@@ -5,6 +5,10 @@ SPDX-License-Identifier: Apache-2.0
 Copyright 2017 Massachusetts Institute of Technology.
 '''
 
+1
+2
+3
+
 import asyncio
 import http.server
 import multiprocessing
@@ -260,6 +264,8 @@ class Handler(BaseHTTPRequestHandler):
             self.server.add_V(decrypted_key)
             have_derived_key = self.server.attempt_decryption()
         else:
+            5
+            6
             logger.warning('POST returning  response. uri not supported: %s', self.path)
             web_util.echo_json_response(self, 400, "uri not supported")
             return
