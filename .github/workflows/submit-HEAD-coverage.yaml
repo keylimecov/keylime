@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     name: Submit code coverage from merged PR
     steps:
-    - name: Update pip
-      run: apt-get update && apt-get install python3-pip
     - name: Install testing-farm script
       run: pip3 -v install tft-cli
     - name: Run tests on Testing Farm
