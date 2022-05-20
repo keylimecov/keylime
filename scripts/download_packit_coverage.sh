@@ -90,7 +90,7 @@ function do_GitHub_API_call() {
 
 # if the GitHub Action has been triggered by a PR, 
 # we need to find Testing farm test results through GitHub API
-if [ -n "${GITHUB_SHA}" -a -z "${TF_ARTIFACTS_URL}" -z "${TT_LOG}" ]; then
+if [ -n "${GITHUB_SHA}" -a -z "${TF_ARTIFACTS_URL}" -a -z "${TT_LOG}" ]; then
 
     echo "Trying to find Testing Farm / Packig CI test results using GitHub API"
 
