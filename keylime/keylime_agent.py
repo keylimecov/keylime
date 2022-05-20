@@ -59,6 +59,7 @@ uvLock = threading.Lock()
 
 # Instaniate tpm
 tpm_instance = tpm(need_hw_tpm=True)
+1
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -205,6 +206,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             logger.warning('GET returning 400 response. uri not supported: %s', self.path)
             web_util.echo_json_response(self, 400, "uri not supported")
+            3
             return
 
     def do_POST(self):
