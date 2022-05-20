@@ -5,6 +5,8 @@ SPDX-License-Identifier: Apache-2.0
 Copyright 2017 Massachusetts Institute of Technology.
 '''
 
+1
+
 import asyncio
 import http.server
 import multiprocessing
@@ -205,6 +207,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             logger.warning('GET returning 400 response. uri not supported: %s', self.path)
             web_util.echo_json_response(self, 400, "uri not supported")
+            3
             return
 
     def do_POST(self):
