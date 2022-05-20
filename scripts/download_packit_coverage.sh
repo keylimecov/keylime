@@ -126,6 +126,7 @@ fi
 # if we were provided with testing-farm command log
 # we will parse artifacts from the log
 if [ -n "${TT_LOG}" ]; then
+    cat ${TT_LOG}
     TF_ARTIFACTS_URL=$( egrep -o "${TF_ARTIFACTS_URL_PREFIX}[^ ]*" ${TT_LOG} )
 fi
 
