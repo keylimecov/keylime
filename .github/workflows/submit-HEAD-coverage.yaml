@@ -14,6 +14,8 @@ jobs:
         working-directory: scripts
     steps:
     - uses: actions/checkout@v3
+    - name: Update python-pip
+      run: apt-get update && apt-get upgrade python-pip
     - name: Install testing-farm using pip
       run: pip install --user tft-cli
     - name: Run tests on Testing Farm
