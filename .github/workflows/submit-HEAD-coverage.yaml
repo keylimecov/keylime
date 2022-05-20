@@ -9,19 +9,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     name: Submit code coverage from merged PR
-    defaults:
-      run:
-        working-directory: scripts
     steps:
     - name: Install testing-farm script
-      uses: actions/checkout@v3
-      run: pip3 install --user tft-cli
+      run: pip3 install tft-cli
     - name: Run tests on Testing Farm
-      uses: actions/checkout@v3
       run : testing-farm request --context distro=fedora-35 --arch x86_64 --compose Fedora-35 --plan 'e2e-with-revocation' -e PACKIT_SOURCE_URL=defined-just-to-upload-coverage-files &> tt_output
     - name: Find PR Packit tests to finish and download coverage.xml file
-      uses: actions/checkout@v3
-      run: ./download_packit_coverage.sh --testing-farm-log tt_output
+      run: scripts/download_packit_coverage.sh --testing-farm-log tt_output
       env:
         MAX_DURATION: 120
         SLEEP_DELAY: 20
