@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     name: Submit code coverage from merged PR
     steps:
     - name: Install testing-farm script
