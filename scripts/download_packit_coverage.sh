@@ -26,16 +26,19 @@ MAX_DURATION="${MAX_DURATION:-5400}"  # 90 minutes
 SLEEP_DELAY="${SLEEP_DELAY:-120}"
 
 # github user/project we are going to work with
-PROJECT="keylime/keylime"
-#PROJECT="keylimecov/keylime"
+#PROJECT="keylime/keylime"
+PROJECT="keylimecov/keylime"
 
 # TF_JOB_DESC points to a Testing farm job that does code coverage measurement and 
 # uploads coverage XML files to a web drive
 # currently we are doing that in a job running tests on Fedora-35
 TF_JOB_DESC="testing-farm:fedora-35-x86_64"
+TF_TEST_OUTPUT="/setup/generate_coverage_report/output.txt"
+TF_ARTIFACTS_URL_PREFIX="https://artifacts.dev.testing-farm.io"
 
 GITHUB_API_PREFIX_URL="https://api.github.com/repos/${PROJECT}"
-TF_ARTIFACTS_URL_PREFIX="https://artifacts.dev.testing-farm.io"
+
+WEBDRIVE_URL="https://(transfer.sh|free.keep.sh)"
 
 ##################################
 # no need to change anything below
@@ -120,12 +123,10 @@ fi
 
 # now we have TF_ARTIFACTS_URL so we can proceed with the download
 
-TF_TEST_OUTPUT="/setup/generate_coverage_report/output.txt"
 TF_TESTLOG=$( curl -s ${TF_ARTIFACTS_URL}/results.xml | egrep -o "${TF_ARTIFACTS_URL}.*${TF_TEST_OUTPUT}" )
 echo "TF_TESTLOG=${TF_TESTLOG}"
 
 # parse the URL of coverage XML file on WEBDRIVE_URL and download it
-WEBDRIVE_URL="https://(transfer.sh|free.keep.sh)"
 curl -s "${TF_TESTLOG}" &> ${TMPFILE}
 for REPORT in coverage.packit.xml coverage.testsuite.xml coverage.unittests.xml; do
     COVERAGE_URL=$( grep "$REPORT report is available at" ${TMPFILE} | egrep -o "${WEBDRIVE_URL}.*\.xml" )
