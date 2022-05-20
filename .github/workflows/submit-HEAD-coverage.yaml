@@ -9,8 +9,9 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     name: Submit code coverage from merged PR
-    run:
-      working-directory: scripts
+    defaults:
+      run:
+        working-directory: scripts
     steps:
     - name: Install testing-farm script
       run: pip3 -v install tft-cli
