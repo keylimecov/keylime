@@ -94,10 +94,18 @@ if [ -n "${GITHUB_SHA}" -a -z "${TF_ARTIFACTS_URL}" -a -z "${TT_LOG}" ]; then
 
     echo "Trying to find Testing Farm / Packig CI test results using GitHub API"
 
-    GITHUB_API_PR_URL="${GITHUB_API_COMMIT_URL}/${GITHUB_SHA}/pulls"
+    echo "Fist I need to find the respective PR commit"
+    GITHUB_API_SHA_URL="${GITHUB_API_COMMIT_URL}/${GITHUB_SHA}"
 
+    # Now we try to parse URL of Testing farm job from GITHUB_API_RUNS_URL page
+    GITHUB_PR_SHA=$( do_GitHub_API_call "${GITHUB_API_SHA_URL}" \
+                                     ".parents[1].sha" \
+                                     "Failed to parse PR commit from ${GITHUB_API_RUNS_URL}, trying again after ${SLEEP_DELAY} seconds..." )
+    echo "GITHUB_PR_SHA=${GITHUB_PR_SHA}"
+
+    echo "Now we read check-runs details"
     # build GITHUB_API_RUNS_URL using the COMMIT
-    GITHUB_API_RUNS_URL="${GITHUB_API_COMMIT_URL}/${GITHUB_SHA}/check-runs?check_name=${TF_JOB_DESC}"
+    GITHUB_API_RUNS_URL="${GITHUB_API_COMMIT_URL}/${GITHUB_PR_SHA}/check-runs?check_name=${TF_JOB_DESC}"
     echo "GITHUB_API_RUNS_URL=${GITHUB_API_RUNS_URL}"
 
     # Now we try to parse URL of Testing farm job from GITHUB_API_RUNS_URL page
