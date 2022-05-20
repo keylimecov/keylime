@@ -14,8 +14,12 @@ jobs:
         working-directory: scripts
     steps:
     - uses: actions/checkout@v3
+    - name: Install testing-farm using pip
+      run: pip install --user tft-cli
+    - name: Run tests on Testing Farm
+      run : testing-farm request --context distro=fedora-35 --arch x86_64 --compose Fedora-35 --plan 'e2e-with-revocation' -e PACKIT_SOURCE_URL=defined-just-to-upload-coverage-files &> tt_output
     - name: Find PR Packit tests to finish and download coverage.xml file
-      run: ./download_packit_coverage.sh ${{ github.event.pull_request.head.sha }} || exit 0
+      run: ./download_packit_coverage.sh --testing-farm-log tt_output
       env:
         MAX_DURATION: 120
         SLEEP_DELAY: 20
