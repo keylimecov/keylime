@@ -13,7 +13,7 @@ jobs:
     - name: Install testing-farm script
       run: pip3 -v install tft-cli
     - name: Run tests on Testing Farm
-      run : testing-farm request --context distro=fedora-35 --arch x86_64 --compose Fedora-35 --plan 'e2e-with-revocation' -e PACKIT_SOURCE_URL=defined-just-to-upload-coverage-files &> tt_output
+      run : testing-farm request --context distro=fedora-35 --arch x86_64 --compose Fedora-35 --plan 'e2e-with-revocation' -e PACKIT_SOURCE_URL=defined-just-to-upload-coverage-files | tee tt_output
     - name: Find PR Packit tests to finish and download coverage.xml file
       run: scripts/download_packit_coverage.sh --testing-farm-log tt_output
       env:
