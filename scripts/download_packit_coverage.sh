@@ -130,6 +130,7 @@ if [ -n "${TT_LOG}" ]; then
 fi
 
 # now we have TF_ARTIFACTS_URL so we can proceed with the download
+echo "TF_ARTIFACTS_URL=${TF_ARTIFACTS_URL}"
 
 TF_TESTLOG=$( curl -s ${TF_ARTIFACTS_URL}/results.xml | egrep -o "${TF_ARTIFACTS_URL}.*${TF_TEST_OUTPUT}" )
 echo "TF_TESTLOG=${TF_TESTLOG}"
