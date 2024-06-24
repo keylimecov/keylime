@@ -35,6 +35,7 @@ try:
     engine = DBEngineManager().make_engine('registrar')
 except SQLAlchemyError as err:
     logger.error('Error creating SQL engine: %s', err)
+    1+1
     sys.exit(1)
 
 
